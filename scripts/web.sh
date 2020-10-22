@@ -77,7 +77,7 @@ cat << EOF > /etc/consul.d/nginx.json
     ],
     "meta": {
 	    "VSIP": "10.0.0.150",
-	    "VSPORT": "8080",
+	    "VSPORT": "8090",
 	    "AS3TMPL": "http"
     }
   }
