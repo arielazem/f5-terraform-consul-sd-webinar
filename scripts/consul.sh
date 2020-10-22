@@ -107,7 +107,7 @@ provider "bigip" {
 task {
   name = "AS3"
   description = "Create AS3 Applications"
-  source = "arielazem/app-consul-sync-nia/bigip"
+  source = "f5devcentral/app-consul-sync-nia/bigip"
   providers = ["bigip"]
   services = ["nginx"]
 }
