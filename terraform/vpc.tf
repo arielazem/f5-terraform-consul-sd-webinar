@@ -45,6 +45,20 @@ resource "aws_security_group" "f5" {
     cidr_blocks = ["${var.allow_from}"]
   }
 
+  ingress {
+    from_port   = 8081
+    to_port     = 8081
+    protocol    = "tcp"
+    cidr_blocks = ["${var.allow_from}"]
+  }
+
+  ingress {
+    from_port   = 8082
+    to_port     = 8082
+    protocol    = "tcp"
+    cidr_blocks = ["${var.allow_from}"]
+  }
+
   egress {
     from_port   = 0
     to_port     = 0
