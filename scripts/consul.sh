@@ -85,7 +85,7 @@ sudo touch /etc/consul-tf-sync.d/consul-tf-sync.hcl
 sudo chown --recursive consul:consul /etc/consul-tf-sync.d
 sudo chmod 640 /etc/consul-tf-sync.d/consul-tf-sync.hcl
 
-cat << EOF > /tmp/consul-tf-sync.hcl
+cat << EOF > /tmp/consul-tf-sync.hcl.tmpl
 driver "terraform" {
   log = true
   required_providers {
@@ -99,9 +99,9 @@ consul {
 }
 
 provider "bigip" {
-  address  = ""
-  username = ""
-  password = ""
+  address  = "{{ key "f5/address" }}"
+  username = "{{ key "f5/username" }}"
+  password = "{{ key "f5/password" }}"
 }
 
 task {
@@ -109,10 +109,22 @@ task {
   description = "Create AS3 Applications"
   source = "f5devcentral/app-consul-sync-nia/bigip"
   providers = ["bigip"]
-  services = ["nginx"]
+  services = [{{range services}}"{{.Name}}",{{end}}]
 }
 EOF
-sudo cp /tmp/consul-tf-sync.hcl /etc/consul-tf-sync.d/consul-tf-sync.hcl
+sudo cp /tmp/consul-tf-sync.hcl.tmpl /etc/consul-tf-sync.d/consul-tf-sync.hcl.tmpl
+
+################  Consul-Template  ###########################
+
+#Download Consul-template
+CONSUL_TEMPLATE_VERSION="0.25.1"
+curl --silent --remote-name https://releases.hashicorp.com/consul-template/${CONSUL_TEMPLATE_VERSION}/consul-template_${CONSUL_TEMPLATE_VERSION}_linux_amd64.zip
+
+#Install Consul-template
+sudo apt install unzip
+unzip consul-template_${CONSUL_TEMPLATE_VERSION}_linux_amd64.zip
+sudo chown root:root consul-template
+sudo mv consul-template /usr/local/bin/
 
 #Create Systemd Config
 cat << EOF > /tmp/consul-tf-sync.service
@@ -120,12 +132,12 @@ cat << EOF > /tmp/consul-tf-sync.service
 Description="HashiCorp Consul Terraform Sync"
 Requires=network-online.target
 After=network-online.target
-ConditionFileNotEmpty=/etc/consul-tf-sync.d/consul-tf-sync.hcl
+ConditionFileNotEmpty=/etc/consul-tf-sync.d/consul-tf-sync.hcl.ctmpl
 
 [Service]
 User=consul
 Group=consul
-ExecStart=/usr/local/bin/consul-terraform-sync -config-dir /etc/consul-tf-sync.d/
+ExecStart=/usr/local/bin/consul-template -consul-addr "0.0.0.0:8500" -template "/etc/consul-tf-sync.d/consul-tf-sync.hcl.ctmpl:/etc/consul-tf-sync.d/consul-tf-sync.hcl:/bin/bash -c 'consul-terraform-sync -once -config-file /etc/consul-tf-sync.d/consul-tf-sync.hcl || true'"
 KillMode=process
 Restart=always
 LimitNOFILE=65536
