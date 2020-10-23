@@ -86,8 +86,11 @@ sudo chown --recursive consul:consul /etc/consul-tf-sync.d
 sudo chmod 640 /etc/consul-tf-sync.d/consul-tf-sync.hcl
 
 cat << EOF > /tmp/consul-tf-sync.hcl.tmpl
+# {{ key "f5/reload" }}
 driver "terraform" {
   log = true
+  path = "/etc/consul-tf-sync.d/"
+  working_dir = "/etc/consul-tf-sync.d/"
   required_providers {
     bigip = {
       source = "F5Networks/bigip"
@@ -112,7 +115,7 @@ task {
   services = [{{range services}}"{{.Name}}",{{end}}]
 }
 EOF
-sudo cp /tmp/consul-tf-sync.hcl.tmpl /etc/consul-tf-sync.d/consul-tf-sync.hcl.tmpl
+sudo cp /tmp/consul-tf-sync.hcl.tmpl /etc/consul-tf-sync.d/consul-tf-sync.hcl.ctmpl
 
 ################  Consul-Template  ###########################
 
@@ -126,6 +129,15 @@ unzip consul-template_${CONSUL_TEMPLATE_VERSION}_linux_amd64.zip
 sudo chown root:root consul-template
 sudo mv consul-template /usr/local/bin/
 
+#Create Systemd script
+cat << EOF > /tmp/consul-tf-sync.sh
+#!/bin/bash
+
+/usr/local/bin/consul-template -consul-addr "0.0.0.0:8500" -template "/etc/consul-tf-sync.d/consul-tf-sync.hcl.ctmpl:/etc/consul-tf-sync.d/consul-tf-sync.hcl:/bin/bash -c 'consul-terraform-sync -once -config-file /etc/consul-tf-sync.d/consul-tf-sync.hcl || true'"
+EOF
+sudo cp /tmp/consul-tf-sync.sh /etc/consul-tf-sync.d/consul-tf-sync.sh
+sudo chmod +x /etc/consul-tf-sync.d/consul-tf-sync.sh
+
 #Create Systemd Config
 cat << EOF > /tmp/consul-tf-sync.service
 [Unit]
@@ -135,9 +147,9 @@ After=network-online.target
 ConditionFileNotEmpty=/etc/consul-tf-sync.d/consul-tf-sync.hcl.ctmpl
 
 [Service]
-User=consul
-Group=consul
-ExecStart=/usr/local/bin/consul-template -consul-addr "0.0.0.0:8500" -template "/etc/consul-tf-sync.d/consul-tf-sync.hcl.ctmpl:/etc/consul-tf-sync.d/consul-tf-sync.hcl:/bin/bash -c 'consul-terraform-sync -once -config-file /etc/consul-tf-sync.d/consul-tf-sync.hcl || true'"
+User=root
+Group=root
+ExecStart=/etc/consul-tf-sync.d/consul-tf-sync.sh
 KillMode=process
 Restart=always
 LimitNOFILE=65536
